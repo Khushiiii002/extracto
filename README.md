@@ -7,13 +7,6 @@
 
 ---
 
-## 📸 What It Looks Like
-
-<!-- Upload a screenshot of your app and replace screenshot.png with the actual filename -->
-![Extracto App](extracto.jpeg)
-
----
-
 ## ✨ What It Does
 
 Upload any invoice as a JPG, PNG, or PDF and instantly extract:
