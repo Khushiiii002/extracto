@@ -3,7 +3,7 @@
 > Parse any invoice in seconds using Vision AI. Drop a file, get clean structured data instantly.
 
 ## 🌐 Live Demo
-👉 **[Try it live](extracto-production.up.railway.app)**
+👉 **[Try it live](https://extracto-production.up.railway.app/)**
 
 ---
 
