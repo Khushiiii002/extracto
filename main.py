@@ -120,9 +120,12 @@ async def extract_invoice(file: UploadFile = File(...)):
                 break  # success
 
             except httpx.TimeoutException as e:
-                last_exc = e
-                if attempt == 2:
-                    raise HTTPException(status_code=504, detail="Model inference timed out. Please try again.")
+    last_exc = e
+    if attempt == 2:
+        raise HTTPException(
+            status_code=504, 
+            detail="AI server is waking up from sleep. Please wait 2-3 minutes and try again."
+        )
 
             except httpx.HTTPStatusError as e:
                 last_exc = e
@@ -139,9 +142,12 @@ async def extract_invoice(file: UploadFile = File(...)):
                     )
 
             except httpx.RequestError as e:
-                last_exc = e
-                if attempt == 2:
-                    raise HTTPException(status_code=502, detail=f"Could not reach model server: {e}")
+    last_exc = e
+    if attempt == 2:
+        raise HTTPException(
+            status_code=502, 
+            detail="⚠️ AI server is currently sleeping. Please start it on Lightning AI and try again in 2-3 minutes."
+        )
 
             # Exponential backoff: 0.5s → 1s → 2s
             await asyncio.sleep(0.5 * (2 ** attempt))
