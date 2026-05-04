@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Extracto — Invoice Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#07090f;--ink2:#0d1120;--ink3:#131929;
+  --line:#1a2035;--line2:#232d47;
+  --lime:#4f8ef7;--lime2:#3d7ef0;
+  --lime-dim:rgba(79,142,247,.12);--lime-glow:rgba(79,142,247,.3);
+  --text:#dce4f5;--text2:#7a8db5;--text3:#3d4f72;
+  --red:#ff5c5c;--red-bg:rgba(255,92,92,.1);
+  --amber:#fbbf24;--amber-bg:rgba(251,191,36,.1);
+  --r:10px;--rl:16px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'JetBrains Mono',monospace;background:var(--ink);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");background-size:200px;pointer-events:none;z-index:0}
+.glow-blob{position:fixed;top:-200px;right:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(79,142,247,.1) 0%,rgba(30,60,160,.06) 40%,transparent 70%);pointer-events:none;z-index:0;animation:blobdrift 12s ease-in-out infinite alternate}
+@keyframes blobdrift{from{transform:translate(0,0) scale(1)}to{transform:translate(-60px,80px) scale(1.1)}}
+.shell{position:relative;z-index:1;max-width:1160px;margin:auto;padding:36px 24px 60px}
+nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:52px}
+.logo{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:20px;letter-spacing:-.02em}
+.logo span{color:var(--lime)}
+.badge{font-size:11px;color:var(--text3);border:1px solid var(--line2);border-radius:99px;padding:5px 12px;letter-spacing:.06em}
+.hero{margin-bottom:40px}
+.hero h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(32px,5vw,56px);font-weight:800;line-height:1.08;letter-spacing:-.03em;color:#fff}
+.hero h1 em{font-style:normal;color:var(--lime)}
+.hero p{margin-top:14px;font-size:13px;color:var(--text2);max-width:420px;line-height:1.7}
+.grid{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--ink2);border:1px solid var(--line);border-radius:var(--rl);overflow:hidden}
+.upload-card{display:flex;flex-direction:column}
+.card-header{padding:18px 22px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.card-header .dot{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime-glow)}
+.card-header h3{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--text2);text-transform:uppercase}
+.drop-zone{margin:18px;border:1.5px dashed var(--line2);border-radius:var(--r);padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--lime);background:var(--lime-dim)}
+.drop-zone:hover .drop-icon-wrap,.drop-zone.drag-over .drop-icon-wrap{background:var(--lime)}
+.drop-zone:hover .drop-icon-wrap svg,.drop-zone.drag-over .drop-icon-wrap svg{stroke:var(--ink)}
+.drop-icon-wrap{width:48px;height:48px;border-radius:12px;background:var(--ink3);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;transition:background .2s}
+.drop-icon-wrap svg{width:22px;height:22px;stroke:var(--text2);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s}
+.drop-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:600;color:var(--text);margin-bottom:5px}
+.drop-hint{font-size:11px;color:var(--text3);letter-spacing:.04em}
+.file-preview{margin:0 18px 18px;background:var(--ink3);border:1px solid var(--line2);border-radius:var(--r);padding:12px 14px;display:none;align-items:center;gap:12px}
+.file-preview.show{display:flex}
+.fp-icon{width:36px;height:36px;flex-shrink:0;border-radius:8px;background:var(--lime-dim);border:1px solid rgba(200,251,94,.2);display:flex;align-items:center;justify-content:center}
+.fp-icon svg{width:18px;height:18px;stroke:var(--lime);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.fp-meta{flex:1;min-width:0}
+.fp-name{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp-size{font-size:11px;color:var(--text3);margin-top:2px}
+.fp-remove{cursor:pointer;width:22px;height:22px;border-radius:50%;background:var(--line2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.fp-remove:hover{background:var(--red-bg)}
+.fp-remove svg{width:10px;height:10px;stroke:var(--text2);fill:none;stroke-width:2.5}
+#file-input{display:none}
+.msg-box{display:none;margin:0 18px 14px;border-radius:var(--r);padding:12px 14px;font-size:12px;line-height:1.6}
+.msg-box.show{display:block}
+.msg-box.error{background:var(--red-bg);border:1px solid rgba(255,92,92,.25);color:var(--red)}
+.msg-box.warn{background:var(--amber-bg);border:1px solid rgba(251,191,36,.25);color:var(--amber)}
+.msg-box code{display:block;margin-top:6px;background:rgba(0,0,0,.3);padding:6px 8px;border-radius:6px;font-size:11px;word-break:break-all;color:inherit;opacity:.85}
+.extract-btn{margin:0 18px 18px;padding:14px;border-radius:var(--r);border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;letter-spacing:.02em;background:var(--lime);color:#fff;transition:all .2s;position:relative;overflow:hidden}
+.extract-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 40%,rgba(255,255,255,.25) 50%,transparent 60%);transform:translateX(-100%);transition:transform .5s}
+.extract-btn:not(:disabled):hover{background:var(--lime2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(200,251,94,.3)}
+.extract-btn:not(:disabled):hover::after{transform:translateX(100%)}
+.extract-btn:not(:disabled):active{transform:translateY(0)}
+.extract-btn:disabled{background:var(--ink3);color:var(--text3);cursor:not-allowed;box-shadow:none}
+.result-panel{background:var(--ink2);border:1px solid var(--line);border-radius:var(--rl);overflow:hidden;min-height:420px;display:flex;flex-direction:column}
+.rp-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--text3);padding:40px;text-align:center}
+.rp-placeholder svg{width:40px;height:40px;stroke:var(--line2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.rp-placeholder p{font-size:13px;line-height:1.6}
+.spinner{width:32px;height:32px;border:2.5px solid var(--line2);border-top-color:var(--lime);border-radius:50%;animation:spin .75s linear infinite;box-shadow:0 0 12px rgba(79,142,247,.2)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-bar-wrap{width:180px;height:3px;background:var(--line);border-radius:99px;overflow:hidden}
+.progress-bar-fill{height:100%;background:var(--lime);border-radius:99px;width:0%;transition:width .4s ease}
+.elapsed-badge{font-size:11px;color:var(--text3);letter-spacing:.04em}
+.rp-content{display:none;flex-direction:column;flex:1}
+.rp-header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.rp-header h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
+.rp-meta{display:flex;align-items:center;gap:10px}
+.speed-tag{font-size:11px;padding:4px 10px;border-radius:99px;background:var(--lime-dim);border:1px solid rgba(200,251,94,.2);color:var(--lime);letter-spacing:.04em}
+.fields{padding:8px 0;flex:1}
+.field-row{display:grid;grid-template-columns:160px 1fr;align-items:start;padding:12px 22px;border-bottom:1px solid rgba(44,47,61,.6);animation:fadeSlideIn .3s ease both}
+.field-row:last-child{border-bottom:none}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+.field-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding-top:2px;user-select:none}
+.field-value{font-size:13px;color:var(--text);line-height:1.5;word-break:break-word}
+.field-value.null-val{color:var(--text3);font-style:italic}
+.field-value.highlight{color:var(--lime);font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:15px}
+.li-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+.li-table th{text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);padding:6px 10px 6px 0;border-bottom:1px solid var(--line);font-weight:400}
+.li-table td{padding:8px 10px 8px 0;border-bottom:1px solid rgba(44,47,61,.5);color:var(--text);vertical-align:top}
+.li-table tr:last-child td{border-bottom:none}
+.copy-btn{font-family:'DM Mono',monospace;font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--text2);cursor:pointer;letter-spacing:.04em;transition:all .15s}
+.copy-btn:hover{border-color:var(--lime);color:var(--lime)}
+.copy-btn.copied{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+#server-banner{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink2);border:1px solid var(--line2);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--text2);box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:999;white-space:nowrap;max-width:90vw;text-align:center}
+#server-banner.err{border-color:rgba(255,92,92,.4);color:var(--red)}
+#server-banner.ok{border-color:rgba(200,251,94,.3);color:var(--lime)}
+</style>
+</head>
+<body>
+<div class="glow-blob"></div>
+<div id="server-banner"></div>
+<div class="shell">
+  <nav>
+    <div class="logo">extract<span>o</span></div>
+    <div class="badge">INVOICE INTELLIGENCE</div>
+  </nav>
+  <div class="hero">
+    <h1>Parse any invoice<br/>in <em>seconds.</em></h1>
+    <p>Drop a JPG, PNG or PDF — get clean structured data instantly, powered by vision AI.</p>
+  </div>
+  <div class="grid">
+    <div class="card upload-card">
+      <div class="card-header">
+        <div class="dot"></div>
+        <h3>Upload Invoice</h3>
+      </div>
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-icon-wrap">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        </div>
+        <div class="drop-label">Drop file here</div>
+        <div class="drop-hint">JPG · PNG · PDF &nbsp;/&nbsp; Max 10 MB</div>
+      </div>
+      <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf"/>
+      <div class="file-preview" id="file-preview">
+        <div class="fp-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="fp-meta">
+          <div class="fp-name" id="fp-name"></div>
+          <div class="fp-size" id="fp-size"></div>
+        </div>
+        <div class="fp-remove" id="fp-remove"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+      </div>
+      <div class="msg-box error" id="error-box"></div>
+      <div class="msg-box warn"  id="warn-box"></div>
+      <button class="extract-btn" id="extract-btn" disabled>Extract Invoice Data →</button>
+    </div>
+    <div class="result-panel">
+      <div class="rp-placeholder" id="rp-idle">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+        <p>Extracted data will appear here.<br/>Upload an invoice to get started.</p>
+      </div>
+      <div class="rp-placeholder" id="rp-loading" style="display:none">
+        <div class="spinner"></div>
+        <p id="loading-msg">Reading invoice…</p>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill"></div></div>
+        <div class="elapsed-badge" id="elapsed-live">0.0s</div>
+      </div>
+      <div class="rp-content" id="rp-content">
+        <div class="rp-header">
+          <h2>Extracted Data</h2>
+          <div class="rp-meta">
+            <div class="speed-tag" id="speed-tag">–</div>
+            <button class="copy-btn" id="copy-btn">Copy JSON</button>
+          </div>
+        </div>
+        <div class="fields" id="fields"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// ── Detect file:// protocol (root cause of "Failed to fetch") ──────────────
+const isFileProto = location.protocol === 'file:';
+const warnBox = document.getElementById('warn-box');
+if (isFileProto) {
+  warnBox.innerHTML = '&#9888; Opened as <b>file://</b> — fetch will always fail.<br>Serve via FastAPI instead:' +
+    '<code>uvicorn main:app --reload</code>then open <code>http://localhost:8000</code>';
+  warnBox.classList.add('show');
+}
+
+// ── Server health-check on load ────────────────────────────────────────────
+const banner = document.getElementById('server-banner');
+async function pingServer() {
+  if (isFileProto) return;
+  try {
+    const r = await fetch('/health', { signal: AbortSignal.timeout(4000) });
+    if (r.ok) {
+      banner.textContent = '✓ Server reachable';
+      banner.className = 'ok';
+      banner.style.display = 'block';
+      setTimeout(() => banner.style.display = 'none', 2500);
+    } else {
+      banner.textContent = 'Server /health returned HTTP ' + r.status;
+      banner.className = 'err';
+      banner.style.display = 'block';
+    }
+  } catch (e) {
+    banner.textContent = 'Cannot reach server — is uvicorn running? (' + e.message + ')';
+    banner.className = 'err';
+    banner.style.display = 'block';
+  }
+}
+pingServer();
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const fileInput    = document.getElementById('file-input');
+const dropZone     = document.getElementById('drop-zone');
+const filePreview  = document.getElementById('file-preview');
+const fpName       = document.getElementById('fp-name');
+const fpSize       = document.getElementById('fp-size');
+const fpRemove     = document.getElementById('fp-remove');
+const extractBtn   = document.getElementById('extract-btn');
+const errorBox     = document.getElementById('error-box');
+const rpIdle       = document.getElementById('rp-idle');
+const rpLoading    = document.getElementById('rp-loading');
+const rpContent    = document.getElementById('rp-content');
+const loadingMsg   = document.getElementById('loading-msg');
+const progressFill = document.getElementById('progress-fill');
+const elapsedLive  = document.getElementById('elapsed-live');
+const speedTag     = document.getElementById('speed-tag');
+const fieldsEl     = document.getElementById('fields');
+const copyBtn      = document.getElementById('copy-btn');
+let currentFile = null, lastData = null;
+
+function fmtBytes(b){ return b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB' }
+function setFile(f){ currentFile=f; fpName.textContent=f.name; fpSize.textContent=fmtBytes(f.size); filePreview.classList.add('show'); extractBtn.disabled=false; clearError() }
+function clearFile(){ currentFile=null; fileInput.value=''; filePreview.classList.remove('show'); extractBtn.disabled=true }
+function showError(msg,detail){ errorBox.innerHTML=msg+(detail?'<code>'+detail+'</code>':''); errorBox.classList.add('show') }
+function clearError(){ errorBox.classList.remove('show') }
+function showIdle(){ rpIdle.style.display='flex'; rpLoading.style.display='none'; rpContent.style.display='none' }
+
+dropZone.addEventListener('click', ()=>fileInput.click());
+dropZone.addEventListener('dragover', e=>{e.preventDefault();dropZone.classList.add('drag-over')});
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e=>{e.preventDefault();dropZone.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)setFile(f)});
+fileInput.addEventListener('change', ()=>{if(fileInput.files[0])setFile(fileInput.files[0])});
+fpRemove.addEventListener('click', e=>{e.stopPropagation();clearFile();showIdle()});
+
+const STEPS=[[0,'Reading invoice…'],[20,'Decoding image…'],[45,'Running vision model…'],[70,'Extracting fields…'],[88,'Parsing JSON…']];
+let pTimer=null,eTimer=null,stepIdx=0,tStart=0;
+function startLoading(){
+  stepIdx=0;tStart=performance.now();
+  rpIdle.style.display='none';rpContent.style.display='none';rpLoading.style.display='flex';
+  progressFill.style.width='0%';elapsedLive.textContent='0.0s';
+  function tick(){if(stepIdx>=STEPS.length)return;const[pct,msg]=STEPS[stepIdx];progressFill.style.width=pct+'%';loadingMsg.textContent=msg;stepIdx++;pTimer=setTimeout(tick,stepIdx===1?300:1800)}
+  tick();
+  eTimer=setInterval(()=>{elapsedLive.textContent=((performance.now()-tStart)/1000).toFixed(1)+'s'},100);
+}
+function stopLoading(ms){clearTimeout(pTimer);clearInterval(eTimer);progressFill.style.width='100%';elapsedLive.textContent=((ms||0)/1000).toFixed(2)+'s'}
+
+const FIELD_MAP=[
+  {key:'invoice_number',label:'Invoice No'},{key:'date',label:'Date'},{key:'reference_number',label:'Reference No'},
+  {key:'vendor_name',label:'Vendor Name'},{key:'vendor_address',label:'Vendor Address'},
+  {key:'customer_name',label:'Customer Name'},{key:'customer_address',label:'Customer Address'},
+  {key:'total_amount',label:'Total Amount',highlight:true,isCurrency:true},{key:'note',label:'Note'},
+];
+
+// Detect currency symbol from invoice data (vendor address, note, raw amounts)
+function detectCurrency(data){
+  const haystack=JSON.stringify(data).toLowerCase();
+  if(/\binr\b|₹|india|rupee/.test(haystack)) return {sym:'₹',code:'INR'};
+  if(/\bgbp\b|£|united kingdom|britain/.test(haystack)) return {sym:'£',code:'GBP'};
+  if(/\beur\b|€|europe|germany|france|italy|spain/.test(haystack)) return {sym:'€',code:'EUR'};
+  if(/\bjpy\b|¥|japan/.test(haystack)) return {sym:'¥',code:'JPY'};
+  if(/\bcad\b|canada/.test(haystack)) return {sym:'CA$',code:'CAD'};
+  if(/\baud\b|australia/.test(haystack)) return {sym:'A$',code:'AUD'};
+  if(/\bsgd\b|singapore/.test(haystack)) return {sym:'S$',code:'SGD'};
+  if(/\baed\b|uae|dubai/.test(haystack)) return {sym:'AED ',code:'AED'};
+  return {sym:'$',code:'USD'}; // default
+}
+
+function fmtAmount(val, currency){
+  if(val===null||val===undefined||val==='') return null;
+  const num=parseFloat(val);
+  if(isNaN(num)) return val; // return as-is if not a number
+  const formatted=num.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return currency.sym + formatted;
+}
+
+function renderResult(data){
+  fieldsEl.innerHTML='';
+  const currency=detectCurrency(data);
+  FIELD_MAP.forEach(({key,label,highlight,isCurrency},i)=>{
+    const raw=data[key]; const empty=raw===null||raw===undefined||raw==='';
+    const display=(!empty && isCurrency) ? fmtAmount(raw,currency) : raw;
+    const finalEmpty=display===null||display===undefined||display==='';
+    const row=document.createElement('div'); row.className='field-row'; row.style.animationDelay=(i*40)+'ms';
+    const lbl=document.createElement('div'); lbl.className='field-label'; lbl.textContent=label;
+    const vd=document.createElement('div'); vd.className='field-value'+(finalEmpty?' null-val':'')+(highlight&&!finalEmpty?' highlight':''); vd.textContent=finalEmpty?'—':display;
+    row.append(lbl,vd); fieldsEl.append(row);
+  });
+  const items=data.line_items;
+  if(Array.isArray(items)&&items.length){
+    const currency=detectCurrency(data);
+    const row=document.createElement('div'); row.className='field-row'; row.style.animationDelay=(FIELD_MAP.length*40)+'ms';
+    const lbl=document.createElement('div'); lbl.className='field-label'; lbl.textContent='Line Items';
+    const tbl=document.createElement('table'); tbl.className='li-table';
+    tbl.innerHTML='<thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>';
+    const tb=document.createElement('tbody');
+    items.forEach(it=>{
+      const tr=document.createElement('tr');
+      const up=fmtAmount(it.unit_price,currency)||'—';
+      const tot=fmtAmount(it.total,currency)||'—';
+      tr.innerHTML='<td>'+(it.description||'—')+'</td><td>'+(it.qty??'—')+'</td><td>'+up+'</td><td>'+tot+'</td>';
+      tb.append(tr);
+    });
+    tbl.append(tb); row.append(lbl,tbl); fieldsEl.append(row);
+  }
+}
+
+extractBtn.addEventListener('click', async ()=>{
+  if(!currentFile) return;
+  clearError(); extractBtn.disabled=true; startLoading();
+  try {
+    const form=new FormData(); form.append('file',currentFile);
+    let res;
+    try { res=await fetch('/extract',{method:'POST',body:form}) }
+    catch(netErr) {
+      let hint=netErr.message;
+      if(isFileProto) hint='Page opened as file://, not served by FastAPI. Run: uvicorn main:app --reload';
+      else if(/failed to fetch|networkerror/i.test(hint)) hint='Server not running or unreachable. Is uvicorn up? Check terminal.';
+      throw new Error(hint);
+    }
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.detail||'HTTP '+res.status);
+    if(data.error) throw new Error(data.error);
+    stopLoading(data._elapsed_ms||0);
+    lastData=data;
+    speedTag.textContent=((data._elapsed_ms||0)/1000).toFixed(2)+'s'+(data._cache_hit?' · cached':'');
+    setTimeout(()=>{rpLoading.style.display='none';rpContent.style.display='flex';renderResult(data)},300);
+  } catch(err){
+    stopLoading(0); rpLoading.style.display='none'; rpIdle.style.display='flex';
+    showError(err.message);
+  }
+  extractBtn.disabled=false;
+});
+
+copyBtn.addEventListener('click', ()=>{
+  if(!lastData) return;
+  const clean=Object.fromEntries(Object.entries(lastData).filter(([k])=>!k.startsWith('_')));
+  navigator.clipboard.writeText(JSON.stringify(clean,null,2)).then(()=>{
+    copyBtn.textContent='Copied!';copyBtn.classList.add('copied');
+    setTimeout(()=>{copyBtn.textContent='Copy JSON';copyBtn.classList.remove('copied')},1800);
+  });
+});
+</script>
+</body>
+</html>
