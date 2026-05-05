@@ -28,103 +28,116 @@ model.eval()
 # Uncomment if on PyTorch 2.0+ and want ~20% faster inference after warmup
 # model = torch.compile(model, mode="reduce-overhead")
 
-PROMPT = """You are an expert invoice data extraction system. Extract structured data from the invoice image and return ONLY a valid JSON object.
+PROMPT = """You are an expert invoice document extraction system.
 
-Do NOT include explanations, markdown, or extra text.
+Your job is to carefully scan the entire image and extract structured invoice data.
+
+Return ONLY valid JSON. No explanation, no markdown.
+
+────────────────────────────
+CRITICAL INSTRUCTION
+────────────────────────────
+You MUST scan the entire image in this order:
+1. Top section (vendor + header)
+2. Middle section (line items / table)
+3. Bottom section (totals / footer)
+4. Right side / margins (reference numbers, codes)
+
+Do NOT skip any region.
 
 ────────────────────────────
 STRICT RULES
 ────────────────────────────
-- NEVER hallucinate completely missing values
-- NEVER confuse vendor (issuer) with customer (recipient)
-- Use null ONLY when a field is truly not visible anywhere in the invoice
-- If partially visible text exists, extract best possible value instead of null
-- Amounts: extract numeric values only (remove currency symbols if present)
-- Dates: copy exactly as shown
-- Do not reformat names or addresses
+- Do NOT guess completely invisible values
+- If partially visible, extract best possible value
+- Use null only if absolutely no visual evidence exists
+- NEVER default numeric fields to 0 unless explicitly written
+- Extract numbers exactly as seen (remove currency symbols only)
 
 ────────────────────────────
-VENDOR IDENTIFICATION (IMPORTANT)
+VENDOR RULES
 ────────────────────────────
-- Vendor = entity issuing the invoice (usually TOP section)
-- Identify vendor using priority order:
-  1. Top-left / top-center header text
-  2. Business name near logo (logo alone is NOT enough)
-  3. Labels like "From", "Seller", "Issued By", "Supplier"
-- Vendor address is usually directly below or near vendor name
-- If address is split across lines, combine them
-- If partially visible, return partial instead of null
-- Ignore footer, payment, and bank sections for vendor detection
+- Vendor is in TOP section (usually largest text or near logo)
+- Logo text alone is NOT sufficient unless readable text exists near it
+- Address is usually directly under vendor name
+- Combine multi-line addresses
 
 ────────────────────────────
-REFERENCE NUMBER RULES
+REFERENCE NUMBER (VERY IMPORTANT)
 ────────────────────────────
-- reference_number includes ONLY:
-  PO Number, Purchase Order, Receipt No, Shipper No, Container No, Booking No, Order ID, Ref No
-- NEVER use Invoice Number / Bill Number as reference_number
-- Priority if multiple exist:
-  PO Number > Order ID > Receipt No > Shipping references
-- If none exist, return null
+Look carefully in:
+- Top header
+- Right side near invoice number
+- Near barcode / QR codes
+- Labels like: Ref No, PO No, Order ID, Shipper No, Container No, Receipt No
+
+Rules:
+- NEVER use Invoice Number as reference_number
+- If multiple exist, choose most transaction-related:
+  PO Number > Order ID > Receipt No > Shipping IDs
+- If unclear, pick the most visually prominent non-invoice identifier
 
 ────────────────────────────
-AMOUNT EXTRACTION (CRITICAL)
+LINE ITEMS (CRITICAL TABLE EXTRACTION)
 ────────────────────────────
-- Extract from: Total / Grand Total / Amount Due / Balance Due
-- Always attempt extraction even if unclear
-- If multiple totals exist, choose the largest valid total amount
-- Do NOT default to 0
-- Use null only if no numeric value is visible at all
+- Line items are usually in a TABLE format in the middle section
+- Each row = one item
+- Columns may include: description, qty, unit price, total
+
+Rules:
+- Extract ALL visible rows
+- If table borders are missing, still infer rows by alignment
+- If qty/price missing → use null (NOT 0)
+- Do NOT merge rows
 
 ────────────────────────────
-LINE ITEMS
+TOTAL AMOUNT (CRITICAL)
 ────────────────────────────
-- Extract all visible line items
-- If quantities or prices are unclear, use null (NOT 0)
-- Ensure totals are taken directly from invoice if present
+- Look ONLY in bottom section of invoice
+- Labels: Total, Grand Total, Amount Due, Balance Due
+- If multiple totals exist, choose the LARGEST valid amount
+- Prioritize bold / boxed / right-aligned numbers
+- Never return 0 unless explicitly printed
 
 ────────────────────────────
-NOTE EXTRACTION
+NOTE FIELD
 ────────────────────────────
-Include meaningful operational text only.
-
-INCLUDE:
+Include only meaningful business info:
 - Payment instructions
-- Contact details (email, phone, support info)
-- Terms & conditions
-- Tax/legal disclaimers
-- Customer support / query instructions
+- Contact details
+- Terms / tax notes
+- Support info
 
-EXCLUDE:
-- "Thank you for your business"
-- Greetings, slogans, or decorative text
-
-If only generic text exists → return null
+Exclude:
+- Thank you messages
+- Greetings
+- Branding slogans
 
 ────────────────────────────
-OUTPUT FORMAT (STRICT JSON)
+OUTPUT FORMAT
 ────────────────────────────
 {
-  "invoice_number": "Invoice No / Bill No",
-  "date": "invoice date",
-  "reference_number": "PO/Receipt/Shipper/etc or null",
-  "vendor_name": "issuer name",
-  "vendor_address": "issuer address or null",
-  "customer_name": "buyer name or null",
-  "customer_address": "buyer address or null",
+  "invoice_number": "string or null",
+  "date": "string or null",
+  "reference_number": "string or null",
+  "vendor_name": "string or null",
+  "vendor_address": "string or null",
+  "customer_name": "string or null",
+  "customer_address": "string or null",
   "line_items": [
     {
-      "description": "...",
+      "description": "string or null",
       "qty": null,
       "unit_price": null,
       "total": null
     }
   ],
   "total_amount": null,
-  "note": "useful remarks or null"
+  "note": "string or null"
 }
 
-Return ONLY the JSON. No extra text."""
-
+Return ONLY JSON.
+No extra text."""
 
 
 def load_image(file_bytes: bytes, content_type: str) -> Image.Image:
