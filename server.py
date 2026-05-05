@@ -28,127 +28,31 @@ model.eval()
 # Uncomment if on PyTorch 2.0+ and want ~20% faster inference after warmup
 # model = torch.compile(model, mode="reduce-overhead")
 
-PROMPT = """You are an expert invoice OCR extraction system. Your ONLY job is to read the image carefully and return a JSON object.
-
-CRITICAL RULE:
-You MUST prefer extraction over omission. Missing data is worse than imperfect data.
-
-════════════════════════════════════════
-STEP 1 — FULL IMAGE SCAN (MANDATORY)
-════════════════════════════════════════
-Scan all zones in order:
-
-ZONE 1 → TOP-LEFT     : Logo, vendor name  
-ZONE 2 → TOP-RIGHT    : Invoice number, dates, references  
-ZONE 3 → TOP-CENTER   : Document title  
-ZONE 4 → LEFT BLOCK   : Customer billing/shipping details  
-ZONE 5 → MIDDLE TABLE : LINE ITEMS (critical)  
-ZONE 6 → BOTTOM RIGHT : TOTALS (critical)  
-ZONE 7 → FOOTER       : Notes, payment terms, bank details  
-
-Do NOT skip any zone.
-
-════════════════════════════════════════
-STEP 2 — DATE EXTRACTION
-════════════════════════════════════════
-Look for:
-Date, Invoice Date, Bill Date, Tax Date, Issue Date, Dated, Billing Date
+PROMPT = """You are an invoice data extraction expert. Extract fields from this invoice image and return ONLY a valid JSON object — no explanation, no markdown.
 
 Rules:
-- Return exactly as printed (no reformatting)
-- Prefer Invoice/Bill Date if multiple exist
-- Never return null if ANY date exists in ZONE 1–3
+- NEVER guess values not clearly visible
+- NEVER confuse vendor (issuer) with customer (recipient)
+- Set missing fields to null
+- Amounts: numbers only, no currency symbols
+- Dates: exactly as written
 
-════════════════════════════════════════
-STEP 3 — LINE ITEMS (FORCED EXTRACTION)
-════════════════════════════════════════
-ZONE 5 contains tabular or semi-tabular data.
-
-Row detection rules:
-- horizontal alignment
-- repeated spacing patterns
-- consistent numeric columns
-- even without borders
-
-Column mapping:
-- description → item / product / service / particulars / narration
-- qty → quantity / qty / units / nos / pcs
-- unit_price → rate / price / unit cost
-- total → amount / line total / value
-
-HARD RULES:
-- Extract ALL visible rows (no limit)
-- Do NOT stop early
-- Do NOT merge rows
-- Do NOT skip unclear rows
-- Exclude only subtotal/tax/discount lines
-
-FALLBACK RULE:
-If table borders are missing:
-→ reconstruct row-by-row using visual alignment and reading order
-
-════════════════════════════════════════
-STEP 4 — TOTAL AMOUNT (FORCED DETECTION)
-════════════════════════════════════════
-ZONE 6 ONLY.
-
-Search order:
-1. Grand Total
-2. Total Due / Amount Due / Net Payable / Balance Due
-3. Bold or largest number in bottom section
-4. Right-aligned standalone value
-
-HARD RULES:
-- NEVER return null if any number exists in ZONE 6
-- NEVER return 0 unless explicitly shown
-- NEVER guess values
-- Extract raw number only (no currency symbols)
-
-BACKUP RULE:
-If unclear → scan bottom 25% of document for largest monetary value
-
-════════════════════════════════════════
-STEP 5 — NOTE EXTRACTION
-════════════════════════════════════════
-ZONE 7 only:
-- payment terms
-- banking details
-- remarks
-- tax/legal info
-
-RULES:
-- Return exact text if present
-- If nothing exists → null
-- DO NOT use placeholder text
-
-════════════════════════════════════════
-OUTPUT FORMAT
-════════════════════════════════════════
-
-Return ONLY valid JSON:
-
+Return this JSON structure:
 {
   "invoice_number": "Invoice No / Bill No",
   "date": "invoice date",
-  "reference_number": "Ref No / PO Number or null",
+  "reference_number": "Ref No / PO Number / Container No(in line items) / Frieght No(in line items), null if absent",
   "vendor_name": "seller name",
   "vendor_address": "seller address",
   "customer_name": "buyer name",
   "customer_address": "buyer address",
-  "line_items": [
-    {
-      "description": "...",
-      "qty": null,
-      "unit_price": null,
-      "total": null
-    }
-  ],
-  "total_amount": null,
-  "note": null
+  "line_items": [{"description": "...", "qty": 0, "unit_price": 0, "total": 0}],
+  "total_amount": 0,
+  "note": "remarks or null"
 }
 
-Return ONLY JSON. No explanations, no extra text.
-"""
+Return ONLY the JSON. No other text."""
+optimize this prompt so it takes refernce number as any number like shipper number , container number or reciept number as the refernce number but shouldnt take invoice number as ref no
 
 def load_image(file_bytes: bytes, content_type: str) -> Image.Image:
     if content_type == "application/pdf":
