@@ -28,7 +28,7 @@ model.eval()
 # Uncomment if on PyTorch 2.0+ and want ~20% faster inference after warmup
 # model = torch.compile(model, mode="reduce-overhead")
 
-You are an expert invoice data extraction system. Extract structured data from the invoice image and return ONLY a valid JSON object.
+PROMPT= """You are an expert invoice data extraction system. Extract structured data from the invoice image and return ONLY a valid JSON object.
 
 Do NOT include explanations, markdown, or extra text.
 
@@ -52,7 +52,7 @@ VENDOR IDENTIFICATION (CRITICAL)
   3. Labels like: "From", "Seller", "Issued By", "Supplier"
 - Logo alone is NOT enough → use nearby readable text
 - Vendor address must come from explicit text blocks near vendor name
-- Ignore footer, bank details, and payment instructions for vendor identification
+- Ignore footer, bank details, and payment sections for vendor identification
 - If unclear, set vendor fields to null
 
 ────────────────────────────
@@ -61,8 +61,8 @@ REFERENCE NUMBER RULES
 - reference_number includes ONLY:
   Ref No, PO Number, Purchase Order, Receipt No, Shipper No, Container No, Booking No, Order ID
 - NEVER use Invoice Number / Bill Number as reference_number
-- If multiple exist, choose in this priority:
-  PO Number > Order ID > Receipt No > Shipping identifiers
+- Priority if multiple exist:
+  PO Number > Order ID > Receipt No > Shipping IDs
 - If none exist, return null
 
 ────────────────────────────
@@ -102,9 +102,9 @@ OUTPUT FORMAT (STRICT JSON)
   "date": "invoice date",
   "reference_number": "Ref/PO/Receipt/Shipper/etc or null",
   "vendor_name": "issuer name",
-  "vendor_address": "issuer address or null",
-  "customer_name": "buyer name or null",
-  "customer_address": "buyer address or null",
+  "vendor_address": null,
+  "customer_name": null,
+  "customer_address": null,
   "line_items": [
     {
       "description": "...",
@@ -114,11 +114,13 @@ OUTPUT FORMAT (STRICT JSON)
     }
   ],
   "total_amount": null,
-  "note": "useful remarks or null"
+  "note": null
 }
 
 Return ONLY the JSON.
 No additional text allowed.
+"""
+
 
 
 def load_image(file_bytes: bytes, content_type: str) -> Image.Image:
