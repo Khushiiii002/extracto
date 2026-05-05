@@ -30,25 +30,21 @@ model.eval()
 
 PROMPT = """You are an expert invoice OCR extraction system. Your ONLY job is to read the image carefully and return a JSON object.
 
-CRITICAL FAILURE MODES TO AVOID:
-- Returning null for fields that ARE visible in the image
-- Missing dates due to alternate labels
-- Missing totals located at the bottom of the document
-- Skipping line items when table borders are not visible
-- Using default values like 0 or placeholder text when data is missing
+CRITICAL RULE:
+You MUST prefer extraction over omission. Missing data is worse than imperfect data.
 
 ════════════════════════════════════════
 STEP 1 — FULL IMAGE SCAN (MANDATORY)
 ════════════════════════════════════════
-Scan all zones carefully:
+Scan all zones in order:
 
-ZONE 1 → TOP-LEFT     : Logo, vendor name, letterhead  
-ZONE 2 → TOP-RIGHT    : Invoice number, dates, reference numbers  
-ZONE 3 → TOP-CENTER   : Document title (Invoice, Bill, Receipt)  
-ZONE 4 → LEFT BLOCK   : Customer / billing details  
-ZONE 5 → MIDDLE TABLE : Line items (ALL rows)  
-ZONE 6 → BOTTOM RIGHT : Totals (subtotal, tax, grand total, balance due)  
-ZONE 7 → FOOTER       : Notes, payment terms, bank details, tax info  
+ZONE 1 → TOP-LEFT     : Logo, vendor name  
+ZONE 2 → TOP-RIGHT    : Invoice number, dates, references  
+ZONE 3 → TOP-CENTER   : Document title  
+ZONE 4 → LEFT BLOCK   : Customer billing/shipping details  
+ZONE 5 → MIDDLE TABLE : LINE ITEMS (critical)  
+ZONE 6 → BOTTOM RIGHT : TOTALS (critical)  
+ZONE 7 → FOOTER       : Notes, payment terms, bank details  
 
 Do NOT skip any zone.
 
@@ -61,60 +57,72 @@ Date, Invoice Date, Bill Date, Tax Date, Issue Date, Dated, Billing Date
 Rules:
 - Return exactly as printed (no reformatting)
 - Prefer Invoice/Bill Date if multiple exist
-- Never return null if any date is visible in ZONE 1–3
+- Never return null if ANY date exists in ZONE 1–3
 
 ════════════════════════════════════════
-STEP 3 — LINE ITEMS
+STEP 3 — LINE ITEMS (FORCED EXTRACTION)
 ════════════════════════════════════════
-Extract ALL rows from ZONE 5.
+ZONE 5 contains tabular or semi-tabular data.
 
-Identify rows by alignment and spacing, even without borders.
+Row detection rules:
+- horizontal alignment
+- repeated spacing patterns
+- consistent numeric columns
+- even without borders
 
-Map columns:
-- description → Item / Product / Service / Particulars
-- qty → Quantity / Qty / Units
-- unit_price → Rate / Price / Unit Price
-- total → Amount / Line Total / Value
+Column mapping:
+- description → item / product / service / particulars / narration
+- qty → quantity / qty / units / nos / pcs
+- unit_price → rate / price / unit cost
+- total → amount / line total / value
 
-Rules:
-- Extract ALL items
+HARD RULES:
+- Extract ALL visible rows (no limit)
+- Do NOT stop early
 - Do NOT merge rows
-- Ignore subtotal/tax/discount rows
-- Use null only if a column is missing
+- Do NOT skip unclear rows
+- Exclude only subtotal/tax/discount lines
+
+FALLBACK RULE:
+If table borders are missing:
+→ reconstruct row-by-row using visual alignment and reading order
 
 ════════════════════════════════════════
-STEP 4 — TOTAL AMOUNT (STRICT)
+STEP 4 — TOTAL AMOUNT (FORCED DETECTION)
 ════════════════════════════════════════
-Look ONLY in ZONE 6.
+ZONE 6 ONLY.
 
-Prioritize:
+Search order:
 1. Grand Total
 2. Total Due / Amount Due / Net Payable / Balance Due
-3. Largest bold/right-aligned number at bottom
+3. Bold or largest number in bottom section
+4. Right-aligned standalone value
 
-Rules:
-- Extract exact number only (no currency symbols)
-- NEVER return 0 unless explicitly shown as 0
+HARD RULES:
+- NEVER return null if any number exists in ZONE 6
+- NEVER return 0 unless explicitly shown
 - NEVER guess values
-- If multiple totals exist, choose final payable amount
-- If no valid total is found → return null
+- Extract raw number only (no currency symbols)
+
+BACKUP RULE:
+If unclear → scan bottom 25% of document for largest monetary value
 
 ════════════════════════════════════════
-STEP 5 — NOTE EXTRACTION (STRICT)
+STEP 5 — NOTE EXTRACTION
 ════════════════════════════════════════
-Extract ONLY real text from ZONE 7:
-- Payment terms
-- Banking details
-- Remarks
-- Tax/legal info
+ZONE 7 only:
+- payment terms
+- banking details
+- remarks
+- tax/legal info
 
-Rules:
+RULES:
 - Return exact text if present
-- If nothing exists → return null
+- If nothing exists → null
 - DO NOT use placeholder text
 
 ════════════════════════════════════════
-OUTPUT FORMAT (UNCHANGED)
+OUTPUT FORMAT
 ════════════════════════════════════════
 
 Return ONLY valid JSON:
@@ -141,7 +149,6 @@ Return ONLY valid JSON:
 
 Return ONLY JSON. No explanations, no extra text.
 """
-
 
 def load_image(file_bytes: bytes, content_type: str) -> Image.Image:
     if content_type == "application/pdf":
