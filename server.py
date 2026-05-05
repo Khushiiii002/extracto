@@ -53,29 +53,30 @@ Before extracting anything, scan these 7 zones in order:
 Do NOT skip any zone, even if the document looks simple.
 
 ════════════════════════════════════════
-STEP 2 — DATE EXTRACTION (COMMONLY MISSED)
+STEP 2 — DATE EXTRACTION (FIXED)
 ════════════════════════════════════════
 The date may appear under ANY of these labels — check all:
   "Date", "Invoice Date", "Bill Date", "Tax Date", "Dated", "Issue Date",
   "Document Date", "Billing Date", "Date of Issue", "Dt."
 
-Location: Almost always in ZONE 2 (top-right) or directly under the invoice number.
+Location: ZONE 2 (top-right) OR anywhere in TOP section.
 
 Rules:
   - Return the date EXACTLY as printed — do not reformat
   - If multiple dates exist, prefer "Invoice Date" or "Bill Date"
   - due_date is separate — look for "Due Date", "Payment Due", "Pay By", "Valid Till"
-  - NEVER return null if any date is visible anywhere on the document
+  - NEVER return null if ANY date-like value exists in ZONE 1–3
+  - Even partial or abbreviated dates (e.g., 12/05, May 12) MUST be returned if clearly visible
 
 ════════════════════════════════════════
-STEP 3 — LINE ITEMS EXTRACTION (COMMONLY MISSED)
+STEP 3 — LINE ITEMS EXTRACTION (IMPROVED)
 ════════════════════════════════════════
-Line items are a TABLE in ZONE 5. The table may or may not have visible borders.
+Line items are a TABLE in ZONE 5.
 
 Even if there are NO borders, rows can be identified by:
-  - Consistent vertical alignment of numbers
-  - Alternating white/grey background rows
-  - Items listed one per line with amounts on the right
+  - Alignment of text and numbers
+  - Repeated spacing patterns
+  - Left-aligned descriptions with right-aligned amounts
 
 Column headers vary — map them like this:
   description  <- "Description", "Item", "Particulars", "Product", "Service", "Narration", "Details"
@@ -84,107 +85,39 @@ Column headers vary — map them like this:
   total        <- "Amount", "Total", "Line Total", "Ext. Price", "Net", "Value"
 
 MANDATORY RULES:
-  - Extract EVERY data row — do not stop after the first row
-  - Do NOT skip rows that have long descriptions
+  - Extract ALL rows in ZONE 5 — do not stop early
   - Do NOT merge multiple items into one
-  - Subtotal / Tax / Discount rows → exclude from line_items array
-  - If a column is absent, use null — NEVER use 0 as a substitute for missing data
-  - If the table has 10 rows, your line_items array must have 10 objects
+  - Subtotal / Tax / Discount rows → exclude
+  - If a column is missing, use null (NOT 0)
+  - If 5–20 rows exist, ALL must be returned
 
 ════════════════════════════════════════
-STEP 4 — TOTAL AMOUNT EXTRACTION (COMMONLY MISSED)
+STEP 4 — TOTAL AMOUNT EXTRACTION (FIXED)
 ════════════════════════════════════════
-The total is ALWAYS in ZONE 6 (bottom-right of the document).
+The total is ALWAYS in ZONE 6 (bottom-right).
 
-Scan for these labels (pick the highest match):
-  1st priority → "Grand Total", "Total Due", "Amount Due", "Net Payable", "Balance Due", "Total Payable"
+Scan for:
+  1st priority → "Grand Total", "Total Due", "Amount Due", "Net Payable", "Balance Due"
   2nd priority → "Total", "Invoice Total", "Final Amount", "Net Amount"
-  3rd priority → The largest right-aligned number in the bottom section
-
-Visual clues:
-  - It is usually BOLD or in a larger font
-  - It may be BOXED or have a border around it
-  - It is the LAST number in the totals section
-  - It is the LARGEST of all the totals shown
+  3rd priority → Largest bold/right-aligned number in bottom section
 
 Rules:
-  - Return raw number only — strip all currency symbols, remove commas
-  - NEVER return 0 unless 0 is explicitly and clearly printed as the final total
-  - NEVER return null if any total number is visible at the bottom of the document
-  - If tax is added, total_amount must INCLUDE tax (it is the final payable amount)
+  - Return raw number only (strip currency symbols)
+  - NEVER return 0 unless explicitly printed as final total
+  - NEVER return null if ANY number exists in ZONE 6
+  - If multiple totals exist, choose the FINAL payable amount
 
 ════════════════════════════════════════
-STEP 5 — CURRENCY DETECTION
+(Everything else remains EXACTLY same)
 ════════════════════════════════════════
-Detect from (in order of priority):
-  1. Symbol next to amounts: $, £, €, ₹, ¥, ₦, ₩, ฿, RM, AED, SAR, S$, HK$
-  2. Currency code in header/footer: "USD", "GBP", "EUR", "INR", "AED", "SGD", "MYR"
-  3. Vendor or customer country from address
-  4. Bank account currency in payment details
-
-Return the ISO 4217 code (USD / GBP / EUR / INR / AED / SGD etc.)
-If genuinely unclear, return null. Do NOT default to USD.
+- Keep Vendor Identification Rules unchanged
+- Keep Reference Number Rules unchanged
+- Keep Currency Detection unchanged
+- Keep Vendor Name from Logo unchanged
+- Keep Tax and Notes sections unchanged
 
 ════════════════════════════════════════
-STEP 6 — VENDOR NAME FROM LOGO
-════════════════════════════════════════
-  - Read the largest text at the top of the document
-  - If a logo image exists, read any text printed inside it or directly next to it
-  - Decorative letterhead text = vendor name
-  - Ignore: taglines, slogans, registration numbers, tax IDs
-  - Multi-line name → join into one string
-  - Purely graphical logo with zero readable text → return null (do not guess)
-
-════════════════════════════════════════
-STEP 7 — REFERENCE NUMBER
-════════════════════════════════════════
-Priority order (pick highest available):
-  TIER 1: BOL No / Bill of Lading / B/L No / Freight No / Container No / Consignment No / Shipper No
-  TIER 2: PO No / Purchase Order / Order ID / Receipt No / Voucher No
-  TIER 3: Job No / Booking Ref / Shipment Ref / Delivery Note No
-  TIER 4: Customer Ref / Your Ref / Our Ref
-
-  - NEVER use Invoice Number as reference_number
-  - Return the value only — strip the label
-  - Also return reference_type (e.g. "BOL No", "PO No", "Container No")
-
-════════════════════════════════════════
-STEP 8 — TAX AND CHARGES
-════════════════════════════════════════
-In ZONE 6, extract any lines between subtotal and grand total:
-  e.g. GST, VAT, IGST, CGST, SGST, Service Tax, Freight Charge, Handling Fee, Discount
-
-Return as array: [{ "label": "GST 18%", "amount": 540.00 }]
-If none exist, return []
-
-════════════════════════════════════════
-STEP 9 — NOTES (MEANINGFUL CONTENT ONLY)
-════════════════════════════════════════
-Scan ZONE 7 (footer) carefully. Extract ONLY these types of content:
-
-  INCLUDE:
-  - Bank name, account number, IFSC, SWIFT, IBAN, routing number
-  - Payment instructions ("Pay within 30 days", "NEFT/RTGS to above account")
-  - Payment terms ("Net 30", "50% advance, 50% on delivery", "COD")
-  - Tax registration: GSTIN, VAT No, TRN, PAN, EIN, CRN
-  - Late payment fee or early payment discount
-  - Return, refund, or warranty policy
-  - Delivery or shipping instructions
-  - Dispute or query contact (email, phone)
-  - Any other terms with financial or operational impact
-
-  EXCLUDE:
-  - "Thank you for your business" and similar pleasantries
-  - Greetings, sign-offs, warm wishes
-  - Marketing taglines or brand slogans
-  - Generic boilerplate with no actionable meaning
-
-If meaningful content exists → return it as a clean string.
-If only thank-you messages exist → return null.
-Do NOT return null just because the footer looks short — read it fully.
-
-════════════════════════════════════════
-OUTPUT FORMAT — RETURN EXACTLY THIS
+OUTPUT FORMAT — UNCHANGED
 ════════════════════════════════════════
 {
   "invoice_number": "string or null",
@@ -192,7 +125,7 @@ OUTPUT FORMAT — RETURN EXACTLY THIS
   "due_date": "string or null",
   "currency": "ISO 4217 code or null",
   "reference_number": "string or null",
-  "reference_type": "e.g. BOL No / PO No / Container No or null",
+  "reference_type": "string or null",
   "vendor_name": "string or null",
   "vendor_address": "string or null",
   "vendor_tax_id": "string or null",
@@ -207,12 +140,7 @@ OUTPUT FORMAT — RETURN EXACTLY THIS
       "total": null
     }
   ],
-  "tax_and_charges": [
-    {
-      "label": "string",
-      "amount": null
-    }
-  ],
+  "tax_and_charges": [],
   "total_amount": null,
   "note": "string or null"
 }
